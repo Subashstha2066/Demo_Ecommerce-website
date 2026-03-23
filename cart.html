@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cart — NepStack</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="cart-container" style="max-width:var(--max-width);margin:0 auto;padding:16px;">
+  <h1 style="font-size:20px;font-weight:700;margin-bottom:16px;">Shopping Cart</h1>
+  <div id="cart-content"></div>
+</div>
+<script src="products.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+buildNavbar(); buildFooter(); buildBottomNav();
+
+function renderCart() {
+  var cart = getCart();
+  var container = document.getElementById('cart-content');
+  if (cart.length === 0) {
+    container.innerHTML = '<div class="cart-empty"><svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ccc" stroke-width="1.5" style="margin-bottom:16px;"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg><h2 style="font-size:18px;font-weight:700;margin-bottom:8px;">Your Cart is Empty</h2><p style="color:#999;margin-bottom:20px;">Browse our products and add items to your cart.</p><a href="products.html" class="btn btn-primary">Start Shopping</a></div>';
+    return;
+  }
+  var subtotal = cart.reduce(function(sum,i){return sum+i.price*i.quantity;},0);
+  var deliveryFee = subtotal >= 500 ? 0 : 100;
+  var total = subtotal + deliveryFee;
+
+  var itemsHtml = cart.map(function(item) {
+    return '<div class="cart-item" data-id="' + item._cartId + '">'
+      + '<img src="' + item.image + '" alt="' + item.name + '" class="cart-item-img">'
+      + '<div><div class="cart-item-name">' + item.name + '</div>'
+      + '<div class="cart-item-meta">' + (item.size ? 'Size: ' + item.size : '') + '</div></div>'
+      + '<div class="cart-item-price">Rs. ' + item.price.toLocaleString() + '</div>'
+      + '<div><div class="quantity-control">'
+      + '<button class="qty-btn qty-dec" data-id="' + item._cartId + '">−</button>'
+      + '<input type="text" class="qty-display" value="' + item.quantity + '" readonly>'
+      + '<button class="qty-btn qty-inc" data-id="' + item._cartId + '">+</button>'
+      + '</div></div>'
+      + '<div class="cart-item-subtotal">Rs. ' + (item.price*item.quantity).toLocaleString() + '</div>'
+      + '<button class="cart-remove-btn" data-id="' + item._cartId + '" title="Remove">✕</button>'
+      + '</div>';
+  }).join('');
+
+  container.innerHTML = '<div class="cart-page">'
+    + '<div class="cart-items">' + itemsHtml + '</div>'
+    + '<div class="cart-summary"><h3>Order Summary</h3>'
+    + '<div class="cart-summary-row"><span>Subtotal (' + cart.reduce(function(s,i){return s+i.quantity;},0) + ' items)</span><span>Rs. ' + subtotal.toLocaleString() + '</span></div>'
+    + '<div class="cart-summary-row"><span>Delivery Fee</span><span>' + (deliveryFee===0?'<span style="color:#52c41a;font-weight:600;">FREE</span>':'Rs. '+deliveryFee) + '</span></div>'
+    + '<div class="cart-summary-row total"><span>Total</span><span class="amount">Rs. ' + total.toLocaleString() + '</span></div>'
+    + '<a href="checkout.html" class="btn btn-primary btn-block" style="margin-top:16px;display:flex;justify-content:center;">Proceed to Checkout</a>'
+    + '<a href="products.html" class="btn btn-outline btn-block" style="margin-top:8px;display:flex;justify-content:center;">Continue Shopping</a>'
+    + '</div></div>';
+
+  container.querySelectorAll('.qty-dec').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var item = getCart().find(function(i){return i._cartId===btn.dataset.id;});
+      if (item && item.quantity > 1) { updateCartQty(btn.dataset.id, item.quantity-1); renderCart(); }
+    });
+  });
+  container.querySelectorAll('.qty-inc').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var item = getCart().find(function(i){return i._cartId===btn.dataset.id;});
+      if (item) { updateCartQty(btn.dataset.id, item.quantity+1); renderCart(); }
+    });
+  });
+  container.querySelectorAll('.cart-remove-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      removeFromCart(btn.dataset.id);
+      showToast('Item removed');
+      renderCart();
+    });
+  });
+}
+renderCart();
+</script>
+</body>
+</html>

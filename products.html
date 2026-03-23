@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>All Products — NepStack</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="products-page">
+  <aside class="products-sidebar" id="sidebar">
+    <div class="filter-group"><h4>Category</h4><div id="cat-filters"></div></div>
+    <div class="filter-group">
+      <h4>Price Range</h4>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="number" class="form-input" id="min-price" placeholder="Min" style="width:50%;padding:6px 8px;font-size:12px;">
+        <span style="color:var(--text-muted);">—</span>
+        <input type="number" class="form-input" id="max-price" placeholder="Max" style="width:50%;padding:6px 8px;font-size:12px;">
+      </div>
+      <button class="btn btn-outline btn-sm btn-block" id="apply-price" style="margin-top:8px;">Apply</button>
+    </div>
+    <div class="filter-group">
+      <h4>Size</h4>
+      <select class="form-input" id="size-filter" style="font-size:12px;">
+        <option value="">All Sizes</option>
+        <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
+      </select>
+    </div>
+    <button class="btn btn-primary btn-sm btn-block" id="clear-filters" style="margin-top:12px;">Clear All</button>
+  </aside>
+  <div class="products-main">
+    <div class="products-toolbar">
+      <span id="results-count">Loading...</span>
+      <select id="sort-select">
+        <option value="popularity">Sort: Best Selling</option>
+        <option value="newest">Sort: Newest</option>
+        <option value="price-low">Price: Low to High</option>
+        <option value="price-high">Price: High to Low</option>
+        <option value="rating">Sort: Top Rated</option>
+      </select>
+    </div>
+    <div class="products-grid" id="products-grid"></div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+</div>
+<script src="products.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+buildNavbar(); buildFooter(); buildBottomNav();
+
+var params = new URLSearchParams(window.location.search);
+var selectedCategory = params.get('category') || '';
+var searchQuery = params.get('search') || '';
+var currentPage = 1;
+var cats = ["Tshirts","Hoodies","Pants","Jackets","Caps","Bags","Shoes","Accessories"];
+
+var catFilters = document.getElementById('cat-filters');
+cats.forEach(function(cat) {
+  var lbl = document.createElement('label');
+  lbl.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:8px;cursor:pointer;';
+  lbl.innerHTML = '<input type="checkbox" value="' + cat + '" ' + (selectedCategory === cat ? 'checked' : '') + ' style="accent-color:#3d6df5;"> ' + cat;
+  catFilters.appendChild(lbl);
+});
+
+if (searchQuery) {
+  var ni = document.getElementById('nav-search-input');
+  if (ni) ni.value = searchQuery;
+}
+
+function renderProducts() {
+  var sortBy = document.getElementById('sort-select').value;
+  var sizeVal = document.getElementById('size-filter').value;
+  var minP = document.getElementById('min-price').value ? Number(document.getElementById('min-price').value) : undefined;
+  var maxP = document.getElementById('max-price').value ? Number(document.getElementById('max-price').value) : undefined;
+  var checked = Array.from(catFilters.querySelectorAll('input:checked')).map(function(i){return i.value;});
+  var catFilter = checked.length === 1 ? checked[0] : '';
+
+  var result;
+  if (searchQuery) {
+    var sr = searchProducts(searchQuery);
+    if (catFilter) sr = sr.filter(function(p){return p.category===catFilter;});
+    if (sizeVal) sr = sr.filter(function(p){return p.sizes.includes(sizeVal);});
+    if (minP !== undefined) sr = sr.filter(function(p){return p.price>=minP;});
+    if (maxP !== undefined) sr = sr.filter(function(p){return p.price<=maxP;});
+    if (sortBy==='price-low') sr.sort(function(a,b){return a.price-b.price;});
+    else if (sortBy==='price-high') sr.sort(function(a,b){return b.price-a.price;});
+    else if (sortBy==='rating') sr.sort(function(a,b){return b.rating-a.rating;});
+    else if (sortBy==='newest') sr.sort(function(a,b){return b.id-a.id;});
+    else sr.sort(function(a,b){return b.sold-a.sold;});
+    var total=sr.length,perPage=40,totalPages=Math.ceil(total/perPage),start=(currentPage-1)*perPage;
+    result={products:sr.slice(start,start+perPage),total:total,totalPages:totalPages,currentPage:currentPage};
+  } else {
+    result = filterProducts({category:catFilter,minPrice:minP,maxPrice:maxP,size:sizeVal,sortBy:sortBy,page:currentPage,perPage:40});
+  }
+
+  var grid = document.getElementById('products-grid');
+  grid.innerHTML = '';
+  if (result.products.length === 0) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px;color:#999;background:#fff;border-radius:8px;">No products found.</div>';
+  } else {
+    result.products.forEach(function(p) { grid.appendChild(createProductCard(p)); });
+  }
+  document.getElementById('results-count').textContent = result.total.toLocaleString() + ' products';
+
+  var pag = document.getElementById('pagination');
+  pag.innerHTML = '';
+  for (var i = 1; i <= Math.min(result.totalPages, 10); i++) {
+    (function(i) {
+      var btn = document.createElement('button');
+      btn.className = 'page-btn' + (i === currentPage ? ' active' : '');
+      btn.textContent = i;
+      btn.addEventListener('click', function() { currentPage = i; renderProducts(); window.scrollTo(0,0); });
+      pag.appendChild(btn);
+    })(i);
+  }
+}
+
+document.getElementById('sort-select').addEventListener('change', function(){currentPage=1;renderProducts();});
+document.getElementById('size-filter').addEventListener('change', function(){currentPage=1;renderProducts();});
+document.getElementById('apply-price').addEventListener('click', function(){currentPage=1;renderProducts();});
+catFilters.addEventListener('change', function(){currentPage=1;renderProducts();});
+document.getElementById('clear-filters').addEventListener('click', function(){
+  catFilters.querySelectorAll('input').forEach(function(i){i.checked=false;});
+  document.getElementById('min-price').value='';
+  document.getElementById('max-price').value='';
+  document.getElementById('size-filter').value='';
+  document.getElementById('sort-select').value='popularity';
+  searchQuery=''; currentPage=1;
+  var ni=document.getElementById('nav-search-input');if(ni)ni.value='';
+  renderProducts();
+});
+renderProducts();
+</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product — NepStack</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="detail-page">
+  <div class="detail-grid" id="detail-skeleton">
+    <div>
+      <div class="skeleton" style="width:100%;aspect-ratio:1/1;"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <div class="skeleton" style="width:64px;height:64px;"></div>
+        <div class="skeleton" style="width:64px;height:64px;"></div>
+        <div class="skeleton" style="width:64px;height:64px;"></div>
+      </div>
+    </div>
+    <div style="padding:8px;">
+      <div class="skeleton" style="width:30%;height:14px;margin-bottom:12px;"></div>
+      <div class="skeleton" style="width:90%;height:24px;margin-bottom:16px;"></div>
+      <div class="skeleton" style="width:50%;height:28px;margin-bottom:20px;"></div>
+      <div class="skeleton" style="width:100%;height:60px;margin-bottom:16px;"></div>
+      <div class="skeleton" style="width:100%;height:48px;"></div>
+    </div>
+  </div>
+  <div class="detail-grid" id="detail-content" style="display:none;">
+    <div>
+      <img class="detail-main-image" id="main-image" src="" alt="">
+      <div class="detail-thumbnails" id="thumbnails"></div>
+    </div>
+    <div class="detail-info">
+      <div class="detail-category" id="p-category"></div>
+      <h1 class="detail-name" id="p-name"></h1>
+      <div class="detail-prices">
+        <span class="detail-price" id="p-price"></span>
+        <span class="detail-original" id="p-original"></span>
+        <span class="detail-discount" id="p-discount"></span>
+      </div>
+      <div id="p-rating" style="font-size:13px;color:#666;margin-bottom:16px;"></div>
+      <p class="detail-description" id="p-desc"></p>
+      <div class="detail-options" id="size-section" style="display:none;">
+        <div class="detail-option-label">Size</div>
+        <div class="size-options" id="size-options"></div>
+      </div>
+      <div class="detail-options">
+        <div class="detail-option-label">Quantity</div>
+        <div class="quantity-control">
+          <button class="qty-btn" id="qty-minus">−</button>
+          <input type="text" class="qty-display" id="qty-display" value="1" readonly>
+          <button class="qty-btn" id="qty-plus">+</button>
+        </div>
+      </div>
+      <div class="detail-stock" id="p-stock"></div>
+      <div class="detail-actions">
+        <button class="btn btn-buy" id="buy-now-btn">Buy Now</button>
+        <button class="btn btn-primary" id="add-to-cart-btn">Add to Cart</button>
+      </div>
+      <div class="detail-delivery">
+        <div class="detail-delivery-row">🚚 Standard Delivery — 3-5 days across Nepal</div>
+        <div class="detail-delivery-row">🔄 Free returns within 7 days</div>
+        <div class="detail-delivery-row">💵 Cash on Delivery available</div>
+      </div>
+    </div>
+  </div>
+  <section class="section" style="padding:24px 0 0;">
+    <div class="section-header"><h2>Related Products</h2></div>
+    <div class="product-grid" id="related-grid"></div>
+  </section>
+</div>
+<script src="products.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+buildNavbar(); buildFooter(); buildBottomNav();
+
+var params = new URLSearchParams(window.location.search);
+var productId = Number(params.get('id'));
+if (!productId) window.location.href = 'products.html';
+
+var product = getProductById(productId);
+if (!product) {
+  document.querySelector('.detail-page').innerHTML = '<div style="text-align:center;padding:80px 20px;"><h2>Product Not Found</h2><a href="products.html" class="btn btn-primary" style="margin-top:16px;display:inline-block;">Browse Products</a></div>';
+} else {
+  var selectedSize = '';
+  var quantity = 1;
+
+  document.title = product.name + ' — NepStack';
+  document.getElementById('main-image').src = product.image;
+  document.getElementById('main-image').alt = product.name;
+  document.getElementById('p-category').textContent = product.category;
+  document.getElementById('p-name').textContent = product.name;
+  document.getElementById('p-price').textContent = 'Rs. ' + product.price.toLocaleString();
+  document.getElementById('p-original').textContent = 'Rs. ' + product.originalPrice.toLocaleString();
+  document.getElementById('p-discount').textContent = '-' + product.discount + '%';
+  document.getElementById('p-desc').textContent = product.description;
+  document.getElementById('p-rating').innerHTML = '<span style="color:#faad14;">★</span> ' + product.rating + ' · ' + product.sold.toLocaleString() + ' sold';
+
+  var stockEl = document.getElementById('p-stock');
+  if (product.stock > 0) {
+    stockEl.textContent = '✓ In Stock (' + product.stock + ' available)';
+    stockEl.className = 'detail-stock in-stock';
+  } else {
+    stockEl.textContent = '✕ Out of Stock';
+    stockEl.className = 'detail-stock out-of-stock';
+    document.getElementById('add-to-cart-btn').disabled = true;
+    document.getElementById('buy-now-btn').disabled = true;
+  }
+
+  if (product.sizes && product.sizes.length > 0) {
+    document.getElementById('size-section').style.display = 'block';
+    var sizeEl = document.getElementById('size-options');
+    product.sizes.forEach(function(size) {
+      var btn = document.createElement('button');
+      btn.className = 'size-btn';
+      btn.textContent = size;
+      btn.onclick = function() {
+        selectedSize = size;
+        sizeEl.querySelectorAll('.size-btn').forEach(function(b){b.classList.remove('active');});
+        btn.classList.add('active');
+      };
+      sizeEl.appendChild(btn);
+    });
+  }
+
+  document.getElementById('qty-minus').addEventListener('click', function() {
+    if (quantity > 1) { quantity--; document.getElementById('qty-display').value = quantity; }
+  });
+  document.getElementById('qty-plus').addEventListener('click', function() {
+    if (quantity < product.stock) { quantity++; document.getElementById('qty-display').value = quantity; }
+  });
+
+  function doAddToCart() {
+    if (product.sizes.length > 0 && !selectedSize) { showToast('Please select a size', 'error'); return; }
+    addToCart({id:product.id,name:product.name,price:product.price,image:product.image,category:product.category,originalPrice:product.originalPrice,discount:product.discount}, quantity, selectedSize, null);
+  }
+
+  document.getElementById('add-to-cart-btn').addEventListener('click', doAddToCart);
+  document.getElementById('buy-now-btn').addEventListener('click', function() {
+    if (product.sizes.length > 0 && !selectedSize) { showToast('Please select a size', 'error'); return; }
+    doAddToCart();
+    setTimeout(function(){window.location.href='checkout.html';}, 300);
+  });
+
+  document.getElementById('detail-skeleton').style.display = 'none';
+  document.getElementById('detail-content').style.display = 'grid';
+
+  var related = getProductsByCategory(product.category).filter(function(p){return p.id !== product.id;}).slice(0, 5);
+  var relGrid = document.getElementById('related-grid');
+  related.forEach(function(p) { relGrid.appendChild(createProductCard(p)); });
+}
+</script>
+</body>
+</html>

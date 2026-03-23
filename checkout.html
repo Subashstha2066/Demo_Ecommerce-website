@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — NepStack</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="checkout-page" id="checkout-container">
+  <div class="checkout-form-card">
+    <h2>Delivery Information</h2>
+    <form id="checkout-form">
+      <div class="form-group">
+        <label class="form-label">Full Name *</label>
+        <input type="text" class="form-input" id="c-name" placeholder="Your full name" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Phone Number *</label>
+          <input type="tel" class="form-input" id="c-phone" placeholder="+977 98XXXXXXXX" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Province *</label>
+          <select class="form-input" id="c-province" required>
+            <option value="">Select Province</option>
+            <option>Province 1</option><option>Madhesh</option>
+            <option>Bagmati</option><option>Gandaki</option>
+            <option>Lumbini</option><option>Karnali</option>
+            <option>Sudurpashchim</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">City *</label>
+          <input type="text" class="form-input" id="c-city" placeholder="e.g. Kathmandu" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Area *</label>
+          <input type="text" class="form-input" id="c-area" placeholder="e.g. Thamel" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Full Address *</label>
+        <input type="text" class="form-input" id="c-address" placeholder="Street, House No., Landmark" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Order Notes (Optional)</label>
+        <textarea class="form-input" id="c-notes" rows="3" placeholder="Any special instructions..."></textarea>
+      </div>
+      <div style="margin-top:20px;padding:16px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border);">
+        <h3 style="font-size:14px;font-weight:700;margin-bottom:12px;">Payment Method</h3>
+        <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;">
+          <input type="radio" name="payment" value="cod" checked style="accent-color:#3d6df5;">
+          💵 Cash on Delivery (COD)
+        </label>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="place-order-btn" style="margin-top:20px;padding:14px;">Place Order</button>
+    </form>
+  </div>
+  <div>
+    <div class="cart-summary" style="position:static;">
+      <h3>Order Summary</h3>
+      <div id="checkout-items"></div>
+      <div class="cart-summary-row"><span>Subtotal</span><span id="sum-subtotal">Rs. 0</span></div>
+      <div class="cart-summary-row"><span>Delivery Fee</span><span id="sum-delivery">Rs. 0</span></div>
+      <div class="cart-summary-row total"><span>Total</span><span class="amount" id="sum-total">Rs. 0</span></div>
+    </div>
+  </div>
+</div>
+<div id="order-success" style="display:none;max-width:600px;margin:80px auto;text-align:center;padding:40px 20px;">
+  <div style="font-size:64px;margin-bottom:16px;">✅</div>
+  <h1 style="font-size:24px;font-weight:700;">Order Placed Successfully!</h1>
+  <p style="color:#666;margin:12px 0 8px;">Thank you for shopping at NepStack.</p>
+  <p id="order-id-display" style="color:#999;font-size:13px;margin-bottom:24px;"></p>
+  <a href="index.html" class="btn btn-primary">Continue Shopping</a>
+</div>
+<script src="products.js"></script>
+<script src="firebase-config.js"></script>
+<script>
+buildNavbar(); buildFooter(); buildBottomNav();
+
+var cart = getCart();
+if (cart.length === 0) {
+  document.getElementById('checkout-container').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:80px 20px;"><h2 style="margin-bottom:12px;">Your cart is empty</h2><a href="products.html" class="btn btn-primary">Browse Products</a></div>';
+} else {
+  var itemsEl = document.getElementById('checkout-items');
+  cart.forEach(function(item) {
+    itemsEl.innerHTML += '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#666;"><span>' + item.name + ' × ' + item.quantity + '</span><span>Rs. ' + (item.price*item.quantity).toLocaleString() + '</span></div>';
+  });
+  var subtotal = cart.reduce(function(s,i){return s+i.price*i.quantity;},0);
+  var delivery = subtotal >= 500 ? 0 : 100;
+  var total = subtotal + delivery;
+  document.getElementById('sum-subtotal').textContent = 'Rs. ' + subtotal.toLocaleString();
+  document.getElementById('sum-delivery').innerHTML = delivery===0?'<span style="color:#52c41a;font-weight:600;">FREE</span>':'Rs. '+delivery;
+  document.getElementById('sum-total').textContent = 'Rs. ' + total.toLocaleString();
+
+  document.getElementById('checkout-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = document.getElementById('place-order-btn');
+    btn.disabled = true; btn.textContent = 'Processing...';
+    var orderId = 'ORD-' + Date.now().toString().slice(-8).toUpperCase();
+    var orderData = {
+      id: orderId,
+      customerName: document.getElementById('c-name').value.trim(),
+      phone: document.getElementById('c-phone').value.trim(),
+      province: document.getElementById('c-province').value,
+      city: document.getElementById('c-city').value.trim(),
+      area: document.getElementById('c-area').value.trim(),
+      address: document.getElementById('c-address').value.trim(),
+      notes: document.getElementById('c-notes').value.trim(),
+      payment: 'Cash on Delivery',
+      items: cart.map(function(i){return {id:i.id,name:i.name,price:i.price,quantity:i.quantity,size:i.size||null};}),
+      subtotal: subtotal, deliveryFee: delivery, total: total,
+      status: 'Pending', createdAt: new Date().toISOString()
+    };
+    var orders = JSON.parse(localStorage.getItem('nepstack_orders')||'[]');
+    orders.unshift(orderData);
+    localStorage.setItem('nepstack_orders', JSON.stringify(orders));
+    clearCart();
+    document.getElementById('checkout-container').style.display = 'none';
+    document.getElementById('order-success').style.display = 'block';
+    document.getElementById('order-id-display').textContent = 'Order ID: #' + orderId;
+  });
+}
+</script>
+</body>
+</html>
